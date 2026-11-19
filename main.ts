@@ -1,42 +1,56 @@
-// Solmar — a gta6-01 entry (Node 22, standard library only): an original 2D top-down
-// open-world crime game. The game is this directory's game/ folder, plain static files a
-// desktop browser loads offline (game/index.html and its ES modules, no library and no
-// network request), and the program hands it in. It copies game/ and screenshots/ from
-// beside this file to /output and writes /output/dossier.json, the summary the judge
-// reads, with the vendored make.fun library. Solmar is a sun-soaked coastal city: walk
-// or drive, steal cars (E), traffic and pedestrians, a wanted level of 1–5 stars with
-// police that chase you, a 5-mission story for Riko, combat, HUD with minimap, a start
-// screen and save (C to continue), synthesized WebAudio sounds. Put your 3 or 4 PNG or
-// JPEG screenshots in screenshots/ (the first by name is the cover) and run it.
+// Solmar — entri make.fun "Make GTA 6" (gta6-01).
 //
-// Serve it locally with `node serve.ts`, then open http://localhost:8080.
-// Outside the grader's container, MAKEFUN_OUTPUT_DIR stands in for /output:
-//   mkdir -p out && MAKEFUN_OUTPUT_DIR=out node main.ts
+// Solmar adalah game kejahatan dunia terbuka 2D dari atas (top-down): sebuah
+// kota pesisir yang bisa dijelajahi dengan berjalan kaki atau mengemudi,
+// lengkap dengan lalu lintas, pejalan kaki, pencurian mobil, tingkat buronan
+// bintang 1-5 beserta polisi yang mengejar, cerita lima misi, pertempuran,
+// HUD dan minimap, layar awal, serta simpanan progres di localStorage.
+//
+// File ini adalah entrypoint-nya (Node 22, hanya pustaka standar). Tugasnya
+// sederhana: menyerahkan game dan tangkapan layarnya. Ia menyalin folder
+// game/ dan screenshots/ yang ada di sebelah file ini ke direktori keluaran,
+// lalu menulis dossier.json di sana — ringkasan yang dibaca juri — dengan
+// bantuan pustaka make.fun yang sudah di-vendor di vendor/makefun-game.ts.
+//
+// Di luar wadah penilai, MAKEFUN_OUTPUT_DIR menggantikan /output:
+//   mkdir -p out && MAKEFUN_BOT_DIR=. MAKEFUN_OUTPUT_DIR=out node main.ts
 
 import { cpSync, existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { buildDossier } from './vendor/makefun-game.ts';
 
-const here = fileURLToPath(new URL('.', import.meta.url));
-const out = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
+// Folder tempat file ini berada: game/ dan screenshots/ tinggal di sini.
+const rootDir = fileURLToPath(new URL('.', import.meta.url));
 
-mkdirSync(out, { recursive: true });
-cpSync(join(here, 'game'), join(out, 'game'), { recursive: true });
-mkdirSync(join(out, 'screenshots'), { recursive: true });
-if (existsSync(join(here, 'screenshots'))) cpSync(join(here, 'screenshots'), join(out, 'screenshots'), { recursive: true });
+// Tujuan penyerahan; penilai memakai /output, di mesin sendiri bisa diarah-
+// kan ke tempat lain lewat MAKEFUN_OUTPUT_DIR.
+const outputDir = process.env.MAKEFUN_OUTPUT_DIR ?? '/output';
 
-// The scorer's own caps (reference/gate.json): only text_max_bytes shapes the bytes; the others refuse an entry the
-// scorer would refuse (more than 4 screenshots or one over 256 KiB; more than 993 files in game/ or 48 MiB of game
-// files, in all, or a path under game/ over 1000 bytes: game/ counts beside /output's own 1000-entry cap, its
-// screenshots/ and dossier.json).
-writeFileSync(
-  join(out, 'dossier.json'),
-  buildDossier(out, {
-    text_max_bytes: 163840,
-    screenshots: { max: 4, max_bytes: 262144 },
-    game_max_files: 993,
-    game_max_bytes: 50331648,
-    game_path_max_bytes: 1000,
-  }),
-);
+// Menyalin satu pohon folder secara utuh, termasuk subfoldernya.
+function copyTree(from: string, to: string): void {
+  cpSync(from, to, { recursive: true });
+}
+
+mkdirSync(outputDir, { recursive: true });
+copyTree(join(rootDir, 'game'), join(outputDir, 'game'));
+
+const shotsOut = join(outputDir, 'screenshots');
+mkdirSync(shotsOut, { recursive: true });
+const shotsIn = join(rootDir, 'screenshots');
+if (existsSync(shotsIn)) copyTree(shotsIn, shotsOut);
+
+// Batas-batas penilai sendiri (reference/gate.json): hanya text_max_bytes
+// yang membentuk isi dossier; sisanya menolak entri yang memang akan ditolak
+// penilai — lebih dari 4 tangkapan layar atau satu berkas di atas 256 KiB;
+// lebih dari 993 berkas di game/ atau total 48 MiB; atau satu path di bawah
+// game/ yang lebih panjang dari 1000 byte.
+const dossier = buildDossier(outputDir, {
+  text_max_bytes: 163840,
+  screenshots: { max: 4, max_bytes: 262144 },
+  game_max_files: 993,
+  game_max_bytes: 50331648,
+  game_path_max_bytes: 1000,
+});
+
+writeFileSync(join(outputDir, 'dossier.json'), dossier);
